@@ -1,5 +1,7 @@
+from datetime import date
 import uuid
 
+from django.contrib.auth.models import User
 from django.db import models
 from django.urls import reverse
 
@@ -36,6 +38,11 @@ class Book(models.Model):
     def get_absolute_url(self):
         return reverse('book-detail', args=[str(self.id)])
 
+    def display_genre(self):
+        return ', '.join(genre.name for genre in self.genre.all()[:3])
+
+    display_genre.short_description = 'Genre'
+
 
 class BookInstance(models.Model):
     id = models.UUIDField(
@@ -65,13 +72,21 @@ class BookInstance(models.Model):
         default='m',
         help_text='Book availability'
     )
+    borrower = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True)
 
     class Meta:
         ordering = ['due_back']
+        permissions = (("can_mark_returned", "Set book as returned"),)
 
     def __str__(self):
-        return f'{self.id} ({self.book.title})'
+        return f'{self.id} ({self.book.title}) - ({self.status}) - ({self.due_back})'
         # return '{0} ({1})'.format(self.id, self.book.title)
+
+    @property
+    def is_overdue(self):
+        """Determines if the book is overdue based on due date and current date."""
+        return bool(self.due_back and date.today() > self.due_back)
 
 
 class Author(models.Model):
